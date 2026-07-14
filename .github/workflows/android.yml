@@ -25,11 +25,20 @@ jobs:
         gradle-version: '9.3.1'
         validate-wrappers: false
 
-    - name: Build with Gradle
-      run: gradle assembleDebug --no-daemon
+    - name: Decode Debug Keystore
+      run: base64 -d debug.keystore.base64 > debug.keystore
 
-    - name: Upload APK
+    - name: Build with Gradle
+      run: gradle assembleDebug assembleRelease --no-daemon
+
+    - name: Upload Debug APK
       uses: actions/upload-artifact@v4
       with:
         name: app-debug-apk
         path: app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-apk
+        path: app/build/outputs/apk/release/app-release.apk
