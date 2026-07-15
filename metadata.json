@@ -1,6 +1,6 @@
 {
-  "name": "手表验证器",
-  "description": "A Material 3 styled Android offline authenticator designed for compact and circular smartwatch screens, featuring QR scanning and WebDAV sync.",
+  "name": "极简手表验证器",
+  "description": "专为安卓手表深度优化的极简二次验证器，极致小巧，支持方圆屏。",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
