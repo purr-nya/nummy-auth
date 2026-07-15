@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Watch Auth"
+rootProject.name = "Numo Authenticator"
 
 include(":app")

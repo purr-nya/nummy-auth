@@ -1,8 +1,10 @@
 package com.example
 
+import androidx.camera.core.ExperimentalGetImage
 import android.Manifest
 import android.app.KeyguardManager
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.VibrationEffect
@@ -12,9 +14,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -165,7 +173,7 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
         when (screen) {
             "scan" -> Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
                 QrCodeScannerView { code ->
-                    viewModel.addAccount("New", code, "Imported")
+                    viewModel.addAccountFromUri(code)
                     currentScreen = "main"
                 }
                 TopAppBar(
@@ -455,24 +463,162 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
-    
-    AndroidView(
-        factory = { ctx ->
-            val previewView = PreviewView(ctx)
-            cameraProviderFuture.addListener({
-                val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
+    var hasScanned by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                if (cameraProviderFuture.isDone) {
+                    cameraProviderFuture.get().unbindAll()
                 }
-                try {
-                    cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview)
-                } catch (e: Exception) {}
-            }, ContextCompat.getMainExecutor(ctx))
-            previewView
-        },
-        modifier = Modifier.fillMaxSize()
+            } catch (e: Exception) {}
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { ctx ->
+                val previewView = PreviewView(ctx)
+                val executor = ContextCompat.getMainExecutor(ctx)
+                cameraProviderFuture.addListener({
+                    val cameraProvider = cameraProviderFuture.get()
+                    val preview = Preview.Builder().build().also {
+                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    }
+
+                    val scanner = BarcodeScanning.getClient()
+                    val analysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+
+                    analysis.setAnalyzer(executor) { imageProxy ->
+                        processImageProxy(scanner, imageProxy) { result ->
+                            if (!hasScanned) {
+                                hasScanned = true
+                                onScanned(result)
+                            }
+                        }
+                    }
+
+                    try {
+                        cameraProvider.unbindAll()
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            analysis
+                        )
+                    } catch (e: Exception) {}
+                }, executor)
+                previewView
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        ScanningOverlay()
+        
+        Text(
+            "对准二维码以扫描",
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp),
+            color = Color.White.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@Composable
+fun ScanningOverlay() {
+    val infiniteTransition = rememberInfiniteTransition(label = "scanning")
+    val lineY by infiniteTransition.animateFloat(
+        initialValue = 0.1f,
+        targetValue = 0.9f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "line_pos"
     )
+
+    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+        val width = size.width
+        val height = size.height
+        val frameSize = size.minDimension * 0.7f
+        val left = (width - frameSize) / 2
+        val top = (height - frameSize) / 2
+        val right = left + frameSize
+        val bottom = top + frameSize
+
+        // Background mask - using path for the hole
+        val backgroundPath = androidx.compose.ui.graphics.Path().apply {
+            moveTo(0f, 0f)
+            lineTo(width, 0f)
+            lineTo(width, height)
+            lineTo(0f, height)
+            close()
+            
+            moveTo(left, top)
+            lineTo(right, top)
+            lineTo(right, bottom)
+            lineTo(left, bottom)
+            close()
+        }
+        
+        drawPath(
+            path = backgroundPath,
+            color = Color.Black.copy(alpha = 0.6f),
+            style = androidx.compose.ui.graphics.drawscope.Fill
+        )
+
+        // Frame corners
+        val cornerLen = 24.dp.toPx()
+        val stroke = 3.dp.toPx()
+        val cornerColor = Color(0xFFD0BCFF)
+        
+        // TL
+        drawLine(cornerColor, Offset(left, top), Offset(left + cornerLen, top), stroke)
+        drawLine(cornerColor, Offset(left, top), Offset(left, top + cornerLen), stroke)
+        // TR
+        drawLine(cornerColor, Offset(right, top), Offset(right - cornerLen, top), stroke)
+        drawLine(cornerColor, Offset(right, top), Offset(right, top + cornerLen), stroke)
+        // BL
+        drawLine(cornerColor, Offset(left, bottom), Offset(left + cornerLen, bottom), stroke)
+        drawLine(cornerColor, Offset(left, bottom), Offset(left, bottom - cornerLen), stroke)
+        // BR
+        drawLine(cornerColor, Offset(right, bottom), Offset(right - cornerLen, bottom), stroke)
+        drawLine(cornerColor, Offset(right, bottom), Offset(right, bottom - cornerLen), stroke)
+
+        // Scanning line
+        val scanLineY = top + (frameSize * lineY)
+        drawLine(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, Color(0xFFD0BCFF), Color.Transparent)
+            ),
+            start = Offset(left + 8.dp.toPx(), scanLineY),
+            end = Offset(right - 8.dp.toPx(), scanLineY),
+            strokeWidth = 2.dp.toPx()
+        )
+    }
+}
+
+@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
+private fun processImageProxy(
+    scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
+    imageProxy: ImageProxy,
+    onSuccess: (String) -> Unit
+) {
+    val mediaImage = imageProxy.image
+    if (mediaImage != null) {
+        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        scanner.process(image)
+            .addOnSuccessListener { barcodes ->
+                barcodes.firstOrNull()?.rawValue?.let { onSuccess(it) }
+            }
+            .addOnCompleteListener {
+                imageProxy.close()
+            }
+    } else {
+        imageProxy.close()
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

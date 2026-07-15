@@ -4,16 +4,35 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Watch Outer Ring with premium detail -->
     <path
         android:fillColor="#D0BCFF"
         android:pathData="M54,2C25.28,2 2,25.28 2,54s23.28,52 52,52 52,-23.28 52,-52S82.72,2 54,2zM54,98c-24.3,0 -44,-19.7 -44,-44S29.7,10 54,10s44,19.7 44,44 -19.7,44 -44,44z" />
+    
+    <!-- Hour Markers (Tick marks) -->
+    <path android:fillColor="#80D0BCFF" android:pathData="M54,12l0,4" />
+    <path android:fillColor="#80D0BCFF" android:pathData="M54,92l0,4" />
+    <path android:fillColor="#80D0BCFF" android:pathData="M12,54l4,0" />
+    <path android:fillColor="#80D0BCFF" android:pathData="M92,54l4,0" />
+    
+    <path android:fillColor="#60D0BCFF" android:pathData="M33,19l2,3" />
+    <path android:fillColor="#60D0BCFF" android:pathData="M75,19l-2,3" />
+    <path android:fillColor="#60D0BCFF" android:pathData="M33,89l2,-3" />
+    <path android:fillColor="#60D0BCFF" android:pathData="M75,89l-2,-3" />
+    
+    <path android:fillColor="#60D0BCFF" android:pathData="M19,33l3,2" />
+    <path android:fillColor="#60D0BCFF" android:pathData="M19,75l3,-2" />
+    <path android:fillColor="#60D0BCFF" android:pathData="M89,33l-3,2" />
+    <path android:fillColor="#60D0BCFF" android:pathData="M89,75l-3,-2" />
+
+    <!-- Stylized Fingerprint / Biometric Symbol -->
     <path
         android:fillColor="#D0BCFF"
-        android:pathData="M54,24c-12.15,0 -22,9.85 -22,22c0,1.1 0.9,2 2,2s2,-0.9 2,-2c0,-9.93 8.07,-18 18,-18s18,8.07 18,18v4c0,1.1 0.9,2 2,2s2,-0.9 2,-2v-4c0,-12.15 -9.85,-22 -22,-22z" />
+        android:pathData="M54,28c-14.36,0 -26,11.64 -26,26c0,1.1 0.9,2 2,2s2,-0.9 2,-2c0,-12.13 9.87,-22 22,-22s22,9.87 22,22v4c0,1.1 0.9,2 2,2s2,-0.9 2,-2v-4c0,-14.36 -11.64,-26 -26,-26z" />
     <path
         android:fillColor="#D0BCFF"
-        android:pathData="M72,50c-1.1,0 -2,0.9 -2,2v10c0,8.82 -7.18,16 -16,16s-16,-7.18 -16,-16v-10c0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2v10c0,11.03 8.97,20 20,20s20,-8.97 20,-20v-10c0,-1.1 -0.9,-2 -2,-2z" />
+        android:pathData="M76,58c-1.1,0 -2,0.9 -2,2v10c0,11.03 -8.97,20 -20,20s-20,-8.97 -20,-20v-10c0,-1.1 -0.9,-2 -2,-2s-2,0.9 -2,2v10c0,13.23 10.77,24 24,24s24,-10.77 24,-24v-10c0,-1.1 -0.9,-2 -2,-2z" />
     <path
         android:fillColor="#D0BCFF"
-        android:pathData="M54,42c-2.21,0 -4,1.79 -4,4s1.79,4 4,4 4,-1.79 4,-4 -1.79,-4 -4,-4z" />
+        android:pathData="M54,46c-4.42,0 -8,3.58 -8,8s3.58,8 8,8 8,-3.58 8,-8 -3.58,-8 -8,-8zM54,58c-2.21,0 -4,-1.79 -4,-4s1.79,-4 4,-4 4,1.79 4,4 -1.79,4 -4,4z" />
 </vector>

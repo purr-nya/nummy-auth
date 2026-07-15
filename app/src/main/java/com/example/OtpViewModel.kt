@@ -60,6 +60,36 @@ class OtpViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun addAccountFromUri(uriString: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val uri = android.net.Uri.parse(uriString)
+                if (uri.scheme == "otpauth") {
+                    val labelAndIssuer = uri.path?.trim('/') ?: "Unknown"
+                    val secret = uri.getQueryParameter("secret") ?: return@launch
+                    val issuerParam = uri.getQueryParameter("issuer") ?: ""
+                    
+                    val (label, issuer) = if (labelAndIssuer.contains(':')) {
+                        val parts = labelAndIssuer.split(':', limit = 2)
+                        parts[1].trim() to (if (issuerParam.isEmpty()) parts[0].trim() else issuerParam)
+                    } else {
+                        labelAndIssuer to (if (issuerParam.isEmpty()) "Unknown" else issuerParam)
+                    }
+                    
+                    val period = uri.getQueryParameter("period")?.toIntOrNull() ?: 30
+                    addAccount(label, secret, issuer, period)
+                } else {
+                    // Fallback for raw secret codes
+                    if (uriString.length >= 16) {
+                        addAccount("Manual Account", uriString, "Imported")
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore invalid URIs
+            }
+        }
+    }
+
     fun deleteAccount(account: OtpAccount) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.deleteAccount(account)

@@ -1,5 +1,5 @@
 {
-  "name": "Watch Auth",
+  "name": "Numo Authenticator",
   "description": "Premium watch-face styled authenticator optimized for Android and Wear OS.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
