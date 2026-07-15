@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "手表验证器"
+rootProject.name = "Watch Auth"
 
 include(":app")
