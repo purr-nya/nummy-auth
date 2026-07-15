@@ -1,4 +1,9 @@
-# Add project specific ProGuard rules here.
+# OkHttp3 Proguard rules
+-dontwarn okhttp3.internal.platform.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
+
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
 #

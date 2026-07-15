@@ -53,7 +53,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -163,9 +163,9 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
         targetState = currentScreen,
         transitionSpec = {
             if (targetState != "main") {
-                slideInVertically { it } + fadeIn() with slideOutVertically { -it } + fadeOut()
+                slideInVertically { it } + fadeIn() togetherWith slideOutVertically { -it } + fadeOut()
             } else {
-                slideInVertically { -it } + fadeIn() with slideOutVertically { it } + fadeOut()
+                slideInVertically { -it } + fadeIn() togetherWith slideOutVertically { it } + fadeOut()
             }
         },
         label = "screen_transition"
