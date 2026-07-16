@@ -57,6 +57,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -468,51 +470,53 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasScanned by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        AndroidView(
-            factory = { ctx ->
-                val previewView = PreviewView(ctx).apply {
-                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
+    val previewView = remember {
+        PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+
+    LaunchedEffect(lifecycleOwner) {
+        val executor = ContextCompat.getMainExecutor(context)
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+        
+        cameraProviderFuture.addListener({
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    return@addListener
                 }
-                
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                val executor = ContextCompat.getMainExecutor(ctx)
-                
-                cameraProviderFuture.addListener({
+
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+
+                val scanner = BarcodeScanning.getClient()
+                val analysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+
+                analysis.setAnalyzer(executor) { imageProxy ->
+                    processImageProxy(scanner, imageProxy) { result ->
+                        if (!hasScanned) {
+                            hasScanned = true
+                            vibrateFeedback(context)
+                            onScanned(result)
+                        }
+                    }
+                }
+
+                val cameraSelector = when {
+                    cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
+                    cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
+                    else -> CameraSelector.Builder().build()
+                }
+
+                // Retry mechanism for AppOps "Operation not started" on some devices
+                fun bindCamera(retries: Int = 3) {
                     try {
-                        val cameraProvider = cameraProviderFuture.get()
-                        
-                        // Ensure permission is granted before binding
-                        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                            return@addListener
-                        }
-
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
-
-                        val scanner = BarcodeScanning.getClient()
-                        val analysis = ImageAnalysis.Builder()
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
-
-                        analysis.setAnalyzer(executor) { imageProxy ->
-                            processImageProxy(scanner, imageProxy) { result ->
-                                if (!hasScanned) {
-                                    hasScanned = true
-                                    vibrateFeedback(ctx)
-                                    onScanned(result)
-                                }
-                            }
-                        }
-
-                        val cameraSelector = when {
-                            cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
-                            cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
-                            else -> CameraSelector.Builder().build()
-                        }
-
                         cameraProvider.unbindAll()
                         cameraProvider.bindToLifecycle(
                             lifecycleOwner,
@@ -521,12 +525,27 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
                             analysis
                         )
                     } catch (e: Exception) {
-                        // Fail gracefully
+                        if (retries > 0) {
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                bindCamera(retries - 1)
+                            }, 500)
+                        } else {
+                            e.printStackTrace()
+                        }
                     }
-                }, executor)
+                }
                 
-                previewView
-            },
+                bindCamera()
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }, executor)
+    }
+
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        AndroidView(
+            factory = { previewView },
             modifier = Modifier.fillMaxSize()
         )
 
