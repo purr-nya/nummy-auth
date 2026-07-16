@@ -242,43 +242,8 @@ fun WatchFaceInterface(
     ) {
         Box(
             modifier = Modifier
-                .size(screenWidth)
-                .padding(8.dp)
-                .shadow(16.dp, if (isRound) CircleShape else RoundedCornerShape(32.dp))
-                .drawBehind {
-                    val radius = size.minDimension / 2
-                    if (isRound) {
-                        drawCircle(
-                            brush = Brush.radialGradient(
-                                colors = listOf(Color(0xFF222222), Color(0xFF000000)),
-                                center = center,
-                                radius = radius
-                            )
-                        )
-                        drawCircle(
-                            color = Color(0xFF333333),
-                            radius = radius - 1.dp.toPx(),
-                            style = Stroke(width = 2.dp.toPx())
-                        )
-                    } else {
-                        drawRoundRect(
-                            brush = Brush.linearGradient(
-                                colors = listOf(Color(0xFF222222), Color(0xFF000000)),
-                                start = Offset.Zero,
-                                end = Offset(size.width, size.height)
-                            ),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(32.dp.toPx())
-                        )
-                        drawRoundRect(
-                            color = Color(0xFF333333),
-                            style = Stroke(width = 2.dp.toPx()),
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(32.dp.toPx())
-                        )
-                    }
-                }
-                .padding(if (isRound) 24.dp else 16.dp)
-                .clip(if (isRound) CircleShape else RoundedCornerShape(24.dp))
-                .background(Color.Black),
+                .fillMaxSize()
+                .padding(if (isRound) 8.dp else 4.dp),
             contentAlignment = Alignment.Center
         ) {
             if (accounts.isEmpty()) {
@@ -310,24 +275,24 @@ fun WatchFaceInterface(
 @Composable
 fun WatchTopBar(currentTime: Long, lockEnabled: Boolean, onToggleLock: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(currentTime)),
             color = Color.Gray,
-            style = MaterialTheme.typography.labelSmall
+            style = MaterialTheme.typography.labelMedium
         )
         IconButton(
             onClick = { onToggleLock(!lockEnabled) },
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(28.dp)
         ) {
             Icon(
                 if (lockEnabled) Icons.Default.Lock else Icons.Default.LockOpen,
                 null,
                 tint = if (lockEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
-                modifier = Modifier.size(14.dp)
+                modifier = Modifier.size(16.dp)
             )
         }
     }
@@ -336,7 +301,7 @@ fun WatchTopBar(currentTime: Long, lockEnabled: Boolean, onToggleLock: (Boolean)
 @Composable
 fun WatchBottomBar(currentPage: Int, totalPages: Int, onScan: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -345,16 +310,16 @@ fun WatchBottomBar(currentPage: Int, totalPages: Int, onScan: () -> Unit) {
                 "${currentPage + 1} / $totalPages",
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.DarkGray,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier.padding(horizontal = 12.dp)
             )
         }
         IconButton(
             onClick = onScan,
             modifier = Modifier
-                .size(32.dp)
+                .size(36.dp)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
         ) {
-            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -366,12 +331,12 @@ fun EmptyStateView(onScan: () -> Unit, onManual: () -> Unit, onSync: () -> Unit)
             Icons.Default.Fingerprint,
             null,
             tint = Color.DarkGray,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(64.dp)
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text("无活跃账户", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
-        Spacer(modifier = Modifier.height(16.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(modifier = Modifier.height(12.dp))
+        Text("无活跃账户", color = Color.Gray, style = MaterialTheme.typography.bodyLarge)
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             WatchActionButton(Icons.Default.QrCodeScanner, onScan, MaterialTheme.colorScheme.primary)
             WatchActionButton(Icons.Default.Edit, onManual, Color.DarkGray)
             WatchActionButton(Icons.Default.Sync, onSync, Color.DarkGray)
@@ -384,10 +349,10 @@ fun WatchActionButton(icon: ImageVector, onClick: () -> Unit, color: Color) {
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(36.dp)
+            .size(44.dp)
             .background(color.copy(alpha = 0.2f), CircleShape)
     ) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
+        Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
     }
 }
 
@@ -417,7 +382,7 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
     ) {
         Text(
             acc.issuer.ifEmpty { "账户" }.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
             maxLines = 1
@@ -425,34 +390,34 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
         
         Text(
             otp.chunked(3).joinToString(" "),
-            style = MaterialTheme.typography.displaySmall.copy(
-                fontWeight = FontWeight.Black,
-                letterSpacing = 2.sp
+            style = MaterialTheme.typography.displayLarge.copy(
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.sp
             ),
             color = Color.White
         )
         
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(top = 8.dp)) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(top = 10.dp)) {
             CircularProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(36.dp),
                 color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                strokeWidth = 3.dp,
+                strokeWidth = 4.dp,
                 trackColor = Color.DarkGray.copy(alpha = 0.3f)
             )
             Text(
                 "${(progress * 30).toInt()}s",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                 color = Color.White
             )
         }
         
         Text(
             "长按删除",
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
             color = Color.DarkGray,
             modifier = Modifier
-                .padding(top = 12.dp)
+                .padding(top = 16.dp)
                 .clickable { onDelete() }
         )
     }
@@ -465,6 +430,71 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var hasScanned by remember { mutableStateOf(false) }
 
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val executor = ContextCompat.getMainExecutor(context)
+        cameraProviderFuture.addListener({
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+
+                val scanner = BarcodeScanning.getClient()
+                val analysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+
+                analysis.setAnalyzer(executor) { imageProxy ->
+                    processImageProxy(scanner, imageProxy) { result ->
+                        if (!hasScanned) {
+                            hasScanned = true
+                            // Vibrate on success
+                            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                            } else {
+                                vibrator.vibrate(100)
+                            }
+                            onScanned(result)
+                        }
+                    }
+                }
+
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    analysis
+                )
+            } catch (e: Exception) {
+                // Fail gracefully
+            }
+        }, executor)
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            factory = { previewView },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        ScanningOverlay()
+        
+        Text(
+            "对准二维码",
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp),
+            color = Color.White.copy(alpha = 0.9f),
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             try {
@@ -473,56 +503,6 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
                 }
             } catch (e: Exception) {}
         }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        AndroidView(
-            factory = { ctx ->
-                val previewView = PreviewView(ctx)
-                val executor = ContextCompat.getMainExecutor(ctx)
-                cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
-
-                    val scanner = BarcodeScanning.getClient()
-                    val analysis = ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build()
-
-                    analysis.setAnalyzer(executor) { imageProxy ->
-                        processImageProxy(scanner, imageProxy) { result ->
-                            if (!hasScanned) {
-                                hasScanned = true
-                                onScanned(result)
-                            }
-                        }
-                    }
-
-                    try {
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            analysis
-                        )
-                    } catch (e: Exception) {}
-                }, executor)
-                previewView
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
-        ScanningOverlay()
-        
-        Text(
-            "对准二维码以扫描",
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 64.dp),
-            color = Color.White.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.bodyMedium
-        )
     }
 }
 
@@ -533,7 +513,7 @@ fun ScanningOverlay() {
         initialValue = 0.1f,
         targetValue = 0.9f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2500, easing = LinearEasing),
+            animation = tween(2000, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "line_pos"
@@ -542,13 +522,13 @@ fun ScanningOverlay() {
     androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
-        val frameSize = size.minDimension * 0.7f
+        val frameSize = size.minDimension * 0.85f // Enlarged frame
         val left = (width - frameSize) / 2
         val top = (height - frameSize) / 2
         val right = left + frameSize
         val bottom = top + frameSize
 
-        // Background mask - using path for the hole
+        // Background mask
         val backgroundPath = androidx.compose.ui.graphics.Path().apply {
             moveTo(0f, 0f)
             lineTo(width, 0f)
@@ -565,13 +545,13 @@ fun ScanningOverlay() {
         
         drawPath(
             path = backgroundPath,
-            color = Color.Black.copy(alpha = 0.6f),
+            color = Color.Black.copy(alpha = 0.5f),
             style = androidx.compose.ui.graphics.drawscope.Fill
         )
 
-        // Frame corners
-        val cornerLen = 24.dp.toPx()
-        val stroke = 3.dp.toPx()
+        // Frame corners - Larger and thicker
+        val cornerLen = 32.dp.toPx()
+        val stroke = 4.dp.toPx()
         val cornerColor = Color(0xFFD0BCFF)
         
         // TL
@@ -593,9 +573,9 @@ fun ScanningOverlay() {
             brush = Brush.horizontalGradient(
                 colors = listOf(Color.Transparent, Color(0xFFD0BCFF), Color.Transparent)
             ),
-            start = Offset(left + 8.dp.toPx(), scanLineY),
-            end = Offset(right - 8.dp.toPx(), scanLineY),
-            strokeWidth = 2.dp.toPx()
+            start = Offset(left + 12.dp.toPx(), scanLineY),
+            end = Offset(right - 12.dp.toPx(), scanLineY),
+            strokeWidth = 3.dp.toPx()
         )
     }
 }
