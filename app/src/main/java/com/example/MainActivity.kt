@@ -275,24 +275,24 @@ fun WatchFaceInterface(
 @Composable
 fun WatchTopBar(currentTime: Long, lockEnabled: Boolean, onToggleLock: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(currentTime)),
             color = Color.Gray,
-            style = MaterialTheme.typography.labelMedium
+            style = MaterialTheme.typography.labelLarge
         )
         IconButton(
             onClick = { onToggleLock(!lockEnabled) },
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(32.dp)
         ) {
             Icon(
                 if (lockEnabled) Icons.Default.Lock else Icons.Default.LockOpen,
                 null,
                 tint = if (lockEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(20.dp)
             )
         }
     }
@@ -301,25 +301,25 @@ fun WatchTopBar(currentTime: Long, lockEnabled: Boolean, onToggleLock: (Boolean)
 @Composable
 fun WatchBottomBar(currentPage: Int, totalPages: Int, onScan: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         if (totalPages > 1) {
             Text(
                 "${currentPage + 1} / $totalPages",
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = Color.DarkGray,
-                modifier = Modifier.padding(horizontal = 12.dp)
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
         IconButton(
             onClick = onScan,
             modifier = Modifier
-                .size(36.dp)
+                .size(44.dp)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
         ) {
-            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(22.dp))
+            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(28.dp))
         }
     }
 }
@@ -430,58 +430,56 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var hasScanned by remember { mutableStateOf(false) }
 
-    val previewView = remember {
-        PreviewView(context).apply {
-            scaleType = PreviewView.ScaleType.FILL_CENTER
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        val executor = ContextCompat.getMainExecutor(context)
-        cameraProviderFuture.addListener({
-            try {
-                val cameraProvider = cameraProviderFuture.get()
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
-
-                val scanner = BarcodeScanning.getClient()
-                val analysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-
-                analysis.setAnalyzer(executor) { imageProxy ->
-                    processImageProxy(scanner, imageProxy) { result ->
-                        if (!hasScanned) {
-                            hasScanned = true
-                            // Vibrate on success
-                            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
-                            } else {
-                                vibrator.vibrate(100)
-                            }
-                            onScanned(result)
-                        }
-                    }
-                }
-
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    analysis
-                )
-            } catch (e: Exception) {
-                // Fail gracefully
-            }
-        }, executor)
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(
-            factory = { previewView },
+            factory = { ctx ->
+                val previewView = PreviewView(ctx).apply {
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                }
+                
+                val executor = ContextCompat.getMainExecutor(ctx)
+                cameraProviderFuture.addListener({
+                    try {
+                        val cameraProvider = cameraProviderFuture.get()
+                        val preview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
+                        }
+
+                        val scanner = BarcodeScanning.getClient()
+                        val analysis = ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+
+                        analysis.setAnalyzer(executor) { imageProxy ->
+                            processImageProxy(scanner, imageProxy) { result ->
+                                if (!hasScanned) {
+                                    hasScanned = true
+                                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                        vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+                                    } else {
+                                        @Suppress("DEPRECATION")
+                                        vibrator.vibrate(100)
+                                    }
+                                    onScanned(result)
+                                }
+                            }
+                        }
+
+                        cameraProvider.unbindAll()
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            analysis
+                        )
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }, executor)
+                
+                previewView
+            },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -489,7 +487,7 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
         
         Text(
             "对准二维码",
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
             color = Color.White.copy(alpha = 0.9f),
             style = MaterialTheme.typography.labelSmall
         )
