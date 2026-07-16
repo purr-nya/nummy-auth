@@ -12,6 +12,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.AspectRatio
@@ -172,6 +173,10 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
             currentScreen = "scan"
             isPermissionRequested = false
         }
+    }
+
+    BackHandler(enabled = currentScreen != "main") {
+        currentScreen = "main"
     }
 
     AnimatedContent(
@@ -461,7 +466,6 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
 fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var hasScanned by remember { mutableStateOf(false) }
 
     val previewView = remember {
@@ -471,8 +475,10 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(lifecycleOwner) {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
         val executor = ContextCompat.getMainExecutor(context)
+        
         cameraProviderFuture.addListener({
             try {
                 val cameraProvider = cameraProviderFuture.get()
@@ -507,12 +513,19 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
 
                 try {
                     cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview,
-                        analysis
-                    )
+                    
+                    // Add a delay to avoid AppOps "Operation not started" when returning from permission dialog
+                    lifecycleOwner.lifecycleScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+                        kotlinx.coroutines.delay(500)
+                        try {
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                preview,
+                                analysis
+                            )
+                        } catch (e: Exception) {}
+                    }
                 } catch (e: Exception) {
                     // Fallback or log
                 }
@@ -520,6 +533,17 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
                 // Fail gracefully
             }
         }, executor)
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        onDispose {
+            try {
+                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+                if (cameraProviderFuture.isDone) {
+                    cameraProviderFuture.get().unbindAll()
+                }
+            } catch (e: Exception) {}
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -540,16 +564,6 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
             color = Color.White,
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
         )
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            try {
-                if (cameraProviderFuture.isDone) {
-                    cameraProviderFuture.get().unbindAll()
-                }
-            } catch (e: Exception) {}
-        }
     }
 }
 
