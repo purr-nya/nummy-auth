@@ -468,87 +468,65 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasScanned by remember { mutableStateOf(false) }
 
-    val previewView = remember {
-        PreviewView(context).apply {
-            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-            scaleType = PreviewView.ScaleType.FILL_CENTER
-        }
-    }
-
-    LaunchedEffect(lifecycleOwner) {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        val executor = ContextCompat.getMainExecutor(context)
-        
-        cameraProviderFuture.addListener({
-            try {
-                val cameraProvider = cameraProviderFuture.get()
-                
-                // Ensure permission is granted before binding
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                    return@addListener
-                }
-
-                val preview = Preview.Builder()
-                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                    .build()
-                    .also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
-
-                val scanner = BarcodeScanning.getClient()
-                val analysis = ImageAnalysis.Builder()
-                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-
-                analysis.setAnalyzer(executor) { imageProxy ->
-                    processImageProxy(scanner, imageProxy) { result ->
-                        if (!hasScanned) {
-                            hasScanned = true
-                            vibrateFeedback(context)
-                            onScanned(result)
-                        }
-                    }
-                }
-
-                try {
-                    cameraProvider.unbindAll()
-                    
-                    // Add a delay to avoid AppOps "Operation not started" when returning from permission dialog
-                    lifecycleOwner.lifecycleScope.launch(kotlinx.coroutines.Dispatchers.Main) {
-                        kotlinx.coroutines.delay(500)
-                        try {
-                            cameraProvider.bindToLifecycle(
-                                lifecycleOwner,
-                                CameraSelector.DEFAULT_BACK_CAMERA,
-                                preview,
-                                analysis
-                            )
-                        } catch (e: Exception) {}
-                    }
-                } catch (e: Exception) {
-                    // Fallback or log
-                }
-            } catch (e: Exception) {
-                // Fail gracefully
-            }
-        }, executor)
-    }
-
-    DisposableEffect(lifecycleOwner) {
-        onDispose {
-            try {
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                if (cameraProviderFuture.isDone) {
-                    cameraProviderFuture.get().unbindAll()
-                }
-            } catch (e: Exception) {}
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(
-            factory = { previewView },
+            factory = { ctx ->
+                val previewView = PreviewView(ctx).apply {
+                    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                }
+                
+                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+                val executor = ContextCompat.getMainExecutor(ctx)
+                
+                cameraProviderFuture.addListener({
+                    try {
+                        val cameraProvider = cameraProviderFuture.get()
+                        
+                        // Ensure permission is granted before binding
+                        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                            return@addListener
+                        }
+
+                        val preview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
+                        }
+
+                        val scanner = BarcodeScanning.getClient()
+                        val analysis = ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+
+                        analysis.setAnalyzer(executor) { imageProxy ->
+                            processImageProxy(scanner, imageProxy) { result ->
+                                if (!hasScanned) {
+                                    hasScanned = true
+                                    vibrateFeedback(ctx)
+                                    onScanned(result)
+                                }
+                            }
+                        }
+
+                        val cameraSelector = when {
+                            cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
+                            cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
+                            else -> CameraSelector.Builder().build()
+                        }
+
+                        cameraProvider.unbindAll()
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview,
+                            analysis
+                        )
+                    } catch (e: Exception) {
+                        // Fail gracefully
+                    }
+                }, executor)
+                
+                previewView
+            },
             modifier = Modifier.fillMaxSize()
         )
 
