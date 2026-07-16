@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -28,6 +29,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -55,6 +57,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -243,7 +246,7 @@ fun WatchFaceInterface(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(if (isRound) 8.dp else 4.dp),
+                .padding(if (isRound) 4.dp else 2.dp),
             contentAlignment = Alignment.Center
         ) {
             if (accounts.isEmpty()) {
@@ -259,7 +262,8 @@ fun WatchFaceInterface(
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.weight(1f),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        pageSpacing = 8.dp
                     ) { page ->
                         val acc = accounts[page]
                         OtpDetailView(acc, currentTime, onDelete = { onDelete(acc) })
@@ -275,24 +279,26 @@ fun WatchFaceInterface(
 @Composable
 fun WatchTopBar(currentTime: Long, lockEnabled: Boolean, onToggleLock: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(currentTime)),
             color = Color.Gray,
-            style = MaterialTheme.typography.labelLarge
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
         IconButton(
             onClick = { onToggleLock(!lockEnabled) },
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(38.dp)
         ) {
             Icon(
                 if (lockEnabled) Icons.Default.Lock else Icons.Default.LockOpen,
                 null,
                 tint = if (lockEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(24.dp)
             )
         }
     }
@@ -301,42 +307,48 @@ fun WatchTopBar(currentTime: Long, lockEnabled: Boolean, onToggleLock: (Boolean)
 @Composable
 fun WatchBottomBar(currentPage: Int, totalPages: Int, onScan: () -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         if (totalPages > 1) {
             Text(
-                "${currentPage + 1} / $totalPages",
-                style = MaterialTheme.typography.labelMedium,
+                "${currentPage + 1}/${totalPages}",
+                style = MaterialTheme.typography.labelLarge,
                 color = Color.DarkGray,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 12.dp)
             )
         }
         IconButton(
             onClick = onScan,
             modifier = Modifier
-                .size(44.dp)
+                .size(48.dp)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
         ) {
-            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(28.dp))
+            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(32.dp))
         }
     }
 }
 
 @Composable
 fun EmptyStateView(onScan: () -> Unit, onManual: () -> Unit, onSync: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.fillMaxSize()
+    ) {
         Icon(
             Icons.Default.Fingerprint,
             null,
             tint = Color.DarkGray,
-            modifier = Modifier.size(64.dp)
+            modifier = Modifier.size(80.dp)
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text("无活跃账户", color = Color.Gray, style = MaterialTheme.typography.bodyLarge)
-        Spacer(modifier = Modifier.height(24.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("无活跃账户", color = Color.Gray, style = MaterialTheme.typography.titleLarge)
+        Spacer(modifier = Modifier.height(20.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             WatchActionButton(Icons.Default.QrCodeScanner, onScan, MaterialTheme.colorScheme.primary)
             WatchActionButton(Icons.Default.Edit, onManual, Color.DarkGray)
             WatchActionButton(Icons.Default.Sync, onSync, Color.DarkGray)
@@ -349,13 +361,14 @@ fun WatchActionButton(icon: ImageVector, onClick: () -> Unit, color: Color) {
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(44.dp)
+            .size(52.dp)
             .background(color.copy(alpha = 0.2f), CircleShape)
     ) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(24.dp))
+        Icon(icon, null, tint = color, modifier = Modifier.size(30.dp))
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
     val context = LocalContext.current
@@ -373,26 +386,33 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable {
-                clipboard.setText(androidx.compose.ui.text.AnnotatedString(otp))
-                vibrateFeedback(context)
-            }
+            .padding(horizontal = 8.dp)
+            .combinedClickable(
+                onClick = {
+                    clipboard.setText(androidx.compose.ui.text.AnnotatedString(otp))
+                    vibrateFeedback(context)
+                },
+                onLongClick = { onDelete() }
+            )
     ) {
         Text(
             acc.issuer.ifEmpty { "账户" }.uppercase(),
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1
+            fontWeight = FontWeight.Black,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
         
         Text(
             otp.chunked(3).joinToString(" "),
             style = MaterialTheme.typography.displayLarge.copy(
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 1.sp
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.sp,
+                fontSize = 42.sp
             ),
             color = Color.White
         )
@@ -400,25 +420,23 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(top = 10.dp)) {
             CircularProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(44.dp),
                 color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                strokeWidth = 4.dp,
+                strokeWidth = 5.dp,
                 trackColor = Color.DarkGray.copy(alpha = 0.3f)
             )
             Text(
-                "${(progress * 30).toInt()}s",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                "${(progress * 30).toInt()}",
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
                 color = Color.White
             )
         }
         
         Text(
             "长按删除",
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
             color = Color.DarkGray,
-            modifier = Modifier
-                .padding(top = 16.dp)
-                .clickable { onDelete() }
+            modifier = Modifier.padding(top = 12.dp)
         )
     }
 }
@@ -430,56 +448,56 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     var hasScanned by remember { mutableStateOf(false) }
 
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+
+    LaunchedEffect(lifecycleOwner) {
+        val executor = ContextCompat.getMainExecutor(context)
+        cameraProviderFuture.addListener({
+            try {
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder()
+                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .build()
+                    .also {
+                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    }
+
+                val scanner = BarcodeScanning.getClient()
+                val analysis = ImageAnalysis.Builder()
+                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+
+                analysis.setAnalyzer(executor) { imageProxy ->
+                    processImageProxy(scanner, imageProxy) { result ->
+                        if (!hasScanned) {
+                            hasScanned = true
+                            vibrateFeedback(context)
+                            onScanned(result)
+                        }
+                    }
+                }
+
+                cameraProvider.unbindAll()
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    analysis
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }, executor)
+    }
+
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(
-            factory = { ctx ->
-                val previewView = PreviewView(ctx).apply {
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
-                }
-                
-                val executor = ContextCompat.getMainExecutor(ctx)
-                cameraProviderFuture.addListener({
-                    try {
-                        val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
-
-                        val scanner = BarcodeScanning.getClient()
-                        val analysis = ImageAnalysis.Builder()
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
-
-                        analysis.setAnalyzer(executor) { imageProxy ->
-                            processImageProxy(scanner, imageProxy) { result ->
-                                if (!hasScanned) {
-                                    hasScanned = true
-                                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
-                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                        vibrator.vibrate(android.os.VibrationEffect.createOneShot(100, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
-                                    } else {
-                                        @Suppress("DEPRECATION")
-                                        vibrator.vibrate(100)
-                                    }
-                                    onScanned(result)
-                                }
-                            }
-                        }
-
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            analysis
-                        )
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }, executor)
-                
-                previewView
-            },
+            factory = { previewView },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -487,19 +505,25 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
         
         Text(
             "对准二维码",
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-            color = Color.White.copy(alpha = 0.9f),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 20.dp)
+                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                .padding(horizontal = 8.dp, vertical = 2.dp),
+            color = Color.White,
             style = MaterialTheme.typography.labelSmall
         )
     }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(lifecycleOwner) {
         onDispose {
             try {
                 if (cameraProviderFuture.isDone) {
                     cameraProviderFuture.get().unbindAll()
                 }
-            } catch (e: Exception) {}
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 }
