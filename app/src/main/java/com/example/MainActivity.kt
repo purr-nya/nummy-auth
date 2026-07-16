@@ -2,6 +2,7 @@ package com.example
 
 import androidx.camera.core.ExperimentalGetImage
 import android.Manifest
+import android.content.pm.PackageManager
 import android.app.KeyguardManager
 import android.content.Context
 import android.net.Uri
@@ -71,6 +72,9 @@ import com.example.util.TotpUtils
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -161,6 +165,14 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
     val currentTime by viewModel.currentTime.collectAsStateWithLifecycle()
     var currentScreen by remember { mutableStateOf("main") }
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+    var isPermissionRequested by remember { mutableStateOf(false) }
+
+    LaunchedEffect(cameraPermission.status.isGranted) {
+        if (cameraPermission.status.isGranted && isPermissionRequested) {
+            currentScreen = "scan"
+            isPermissionRequested = false
+        }
+    }
 
     AnimatedContent(
         targetState = currentScreen,
@@ -180,13 +192,13 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
                     currentScreen = "main"
                 }
                 TopAppBar(
-                    title = { Text("扫描二维码", fontSize = 18.sp) },
+                    title = { Text("扫描二维码", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
                         IconButton(onClick = { currentScreen = "main" }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Color.White, modifier = Modifier.size(24.dp))
                         }
                     },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White)
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black.copy(alpha = 0.5f), titleContentColor = Color.White)
                 )
             }
             "manual" -> ManualAddScreen(
@@ -209,8 +221,12 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
                 lockEnabled = isLockEnabled,
                 onToggleLock = onToggleLock,
                 onScan = {
-                    if (cameraPermission.status.isGranted) currentScreen = "scan"
-                    else cameraPermission.launchPermissionRequest()
+                    if (cameraPermission.status.isGranted) {
+                        currentScreen = "scan"
+                    } else {
+                        isPermissionRequested = true
+                        cameraPermission.launchPermissionRequest()
+                    }
                 },
                 onManual = { currentScreen = "manual" },
                 onSync = { currentScreen = "sync" },
@@ -281,24 +297,24 @@ fun WatchTopBar(currentTime: Long, lockEnabled: Boolean, onToggleLock: (Boolean)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 2.dp),
+            .padding(horizontal = 20.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(currentTime)),
             color = Color.Gray,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Black)
         )
         IconButton(
             onClick = { onToggleLock(!lockEnabled) },
-            modifier = Modifier.size(38.dp)
+            modifier = Modifier.size(44.dp)
         ) {
             Icon(
                 if (lockEnabled) Icons.Default.Lock else Icons.Default.LockOpen,
                 null,
                 tint = if (lockEnabled) MaterialTheme.colorScheme.primary else Color.Gray,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(28.dp)
             )
         }
     }
@@ -309,25 +325,25 @@ fun WatchBottomBar(currentPage: Int, totalPages: Int, onScan: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 6.dp),
+            .padding(bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
         if (totalPages > 1) {
             Text(
                 "${currentPage + 1}/${totalPages}",
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = Color.DarkGray,
-                modifier = Modifier.padding(horizontal = 12.dp)
+                modifier = Modifier.padding(horizontal = 16.dp)
             )
         }
         IconButton(
             onClick = onScan,
             modifier = Modifier
-                .size(48.dp)
+                .size(56.dp)
                 .background(MaterialTheme.colorScheme.primary, CircleShape)
         ) {
-            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(32.dp))
+            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(36.dp))
         }
     }
 }
@@ -343,12 +359,12 @@ fun EmptyStateView(onScan: () -> Unit, onManual: () -> Unit, onSync: () -> Unit)
             Icons.Default.Fingerprint,
             null,
             tint = Color.DarkGray,
-            modifier = Modifier.size(80.dp)
+            modifier = Modifier.size(100.dp)
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text("无活跃账户", color = Color.Gray, style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text("无活跃账户", color = Color.Gray, style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold))
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             WatchActionButton(Icons.Default.QrCodeScanner, onScan, MaterialTheme.colorScheme.primary)
             WatchActionButton(Icons.Default.Edit, onManual, Color.DarkGray)
             WatchActionButton(Icons.Default.Sync, onSync, Color.DarkGray)
@@ -361,10 +377,10 @@ fun WatchActionButton(icon: ImageVector, onClick: () -> Unit, color: Color) {
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(52.dp)
+            .size(64.dp)
             .background(color.copy(alpha = 0.2f), CircleShape)
     ) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(30.dp))
+        Icon(icon, null, tint = color, modifier = Modifier.size(36.dp))
     }
 }
 
@@ -389,7 +405,7 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
+            .padding(horizontal = 12.dp)
             .combinedClickable(
                 onClick = {
                     clipboard.setText(androidx.compose.ui.text.AnnotatedString(otp))
@@ -400,7 +416,7 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
     ) {
         Text(
             acc.issuer.ifEmpty { "账户" }.uppercase(),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Black,
             maxLines = 1,
@@ -412,31 +428,31 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
             style = MaterialTheme.typography.displayLarge.copy(
                 fontWeight = FontWeight.Black,
                 letterSpacing = 1.sp,
-                fontSize = 42.sp
+                fontSize = 48.sp
             ),
             color = Color.White
         )
         
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(top = 10.dp)) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(top = 12.dp)) {
             CircularProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(52.dp),
                 color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                strokeWidth = 5.dp,
+                strokeWidth = 6.dp,
                 trackColor = Color.DarkGray.copy(alpha = 0.3f)
             )
             Text(
                 "${(progress * 30).toInt()}",
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
                 color = Color.White
             )
         }
         
         Text(
             "长按删除",
-            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
             color = Color.DarkGray,
-            modifier = Modifier.padding(top = 12.dp)
+            modifier = Modifier.padding(top = 16.dp)
         )
     }
 }
@@ -450,6 +466,7 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
 
     val previewView = remember {
         PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             scaleType = PreviewView.ScaleType.FILL_CENTER
         }
     }
@@ -458,7 +475,13 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
         val executor = ContextCompat.getMainExecutor(context)
         cameraProviderFuture.addListener({
             try {
+                // Ensure permission is granted before proceeding
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                    return@addListener
+                }
+
                 val cameraProvider = cameraProviderFuture.get()
+                
                 val preview = Preview.Builder()
                     .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                     .build()
@@ -483,14 +506,21 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
                 }
 
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    analysis
-                )
+                
+                // Small delay to ensure permission state is propagated
+                lifecycleOwner.lifecycleScope.launch {
+                    delay(200)
+                    try {
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            analysis
+                        )
+                    } catch (e: Exception) {}
+                }
             } catch (e: Exception) {
-                e.printStackTrace()
+                // Fail gracefully
             }
         }, executor)
     }
@@ -504,26 +534,24 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
         ScanningOverlay()
         
         Text(
-            "对准二维码",
+            "请对准二维码",
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 20.dp)
-                .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(bottom = 24.dp)
+                .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 4.dp),
             color = Color.White,
-            style = MaterialTheme.typography.labelSmall
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
         )
     }
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(Unit) {
         onDispose {
             try {
                 if (cameraProviderFuture.isDone) {
                     cameraProviderFuture.get().unbindAll()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (e: Exception) {}
         }
     }
 }
@@ -633,12 +661,13 @@ fun ManualAddScreen(onDismiss: () -> Unit, onAdd: (String, String, String) -> Un
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("手动添加") },
+                title = { Text("手动添加", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(24.dp))
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black, titleContentColor = Color.White)
             )
         },
         containerColor = Color.Black
@@ -647,41 +676,44 @@ fun ManualAddScreen(onDismiss: () -> Unit, onAdd: (String, String, String) -> Un
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp)
+                .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedTextField(
                 value = lState,
                 onValueChange = { lState = it },
-                label = { Text("显示名称") },
+                label = { Text("显示名称", fontSize = 16.sp) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                textStyle = MaterialTheme.typography.bodyLarge
             )
             OutlinedTextField(
                 value = iState,
                 onValueChange = { iState = it },
-                label = { Text("发行者 (可选)") },
+                label = { Text("发行者 (可选)", fontSize = 16.sp) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                textStyle = MaterialTheme.typography.bodyLarge
             )
             OutlinedTextField(
                 value = sState,
                 onValueChange = { sState = it },
-                label = { Text("密钥 (Secret Key)") },
+                label = { Text("密钥 (Secret Key)", fontSize = 16.sp) },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                textStyle = MaterialTheme.typography.bodyLarge
             )
             
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
             
             Button(
                 onClick = { if (sState.isNotEmpty()) onAdd(lState, iState, sState) },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp),
                 enabled = sState.isNotEmpty()
             ) {
-                Text("保存账户")
+                Text("保存账户", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -704,12 +736,13 @@ fun WebDavConfigScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("WebDAV 同步") },
+                title = { Text("WebDAV 同步", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(24.dp))
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black, titleContentColor = Color.White)
             )
         },
         containerColor = Color.Black
@@ -718,47 +751,48 @@ fun WebDavConfigScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp)
+                .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF111111)),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(value = uState, onValueChange = { uState = it }, label = { Text("服务器 URL") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = nState, onValueChange = { nState = it }, label = { Text("用户名") }, modifier = Modifier.fillMaxWidth())
-                    OutlinedTextField(value = pState, onValueChange = { pState = it }, label = { Text("应用密码") }, modifier = Modifier.fillMaxWidth())
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(value = uState, onValueChange = { uState = it }, label = { Text("服务器 URL", fontSize = 14.sp) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = nState, onValueChange = { nState = it }, label = { Text("用户名", fontSize = 14.sp) }, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = pState, onValueChange = { pState = it }, label = { Text("应用密码", fontSize = 14.sp) }, modifier = Modifier.fillMaxWidth())
                 }
             }
             
             OutlinedTextField(
                 value = eState,
                 onValueChange = { eState = it },
-                label = { Text("加密主密码") },
+                label = { Text("加密主密码", fontSize = 14.sp) },
                 placeholder = { Text("用于备份加密") },
                 modifier = Modifier.fillMaxWidth()
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { onSave(config.copy(serverUrl = uState, username = nState, password = pState)) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("保存配置") }
-            }
+            Button(
+                onClick = { onSave(config.copy(serverUrl = uState, username = nState, password = pState)) },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) { Text("保存配置", fontWeight = FontWeight.Bold) }
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { onBackup(config.copy(serverUrl = uState, username = nState, password = pState), eState) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("立即备份") }
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("备份", fontSize = 14.sp) }
                 OutlinedButton(
                     onClick = { onRestore(config.copy(serverUrl = uState, username = nState, password = pState), eState) },
-                    modifier = Modifier.weight(1f)
-                ) { Text("从云端恢复") }
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) { Text("恢复", fontSize = 14.sp) }
             }
         }
     }
