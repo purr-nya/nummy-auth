@@ -471,17 +471,17 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
         }
     }
 
-    LaunchedEffect(lifecycleOwner) {
+    LaunchedEffect(Unit) {
         val executor = ContextCompat.getMainExecutor(context)
         cameraProviderFuture.addListener({
             try {
-                // Ensure permission is granted before proceeding
+                val cameraProvider = cameraProviderFuture.get()
+                
+                // Ensure permission is granted before binding
                 if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                     return@addListener
                 }
 
-                val cameraProvider = cameraProviderFuture.get()
-                
                 val preview = Preview.Builder()
                     .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                     .build()
@@ -505,19 +505,16 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
                     }
                 }
 
-                cameraProvider.unbindAll()
-                
-                // Small delay to ensure permission state is propagated
-                lifecycleOwner.lifecycleScope.launch {
-                    delay(200)
-                    try {
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            analysis
-                        )
-                    } catch (e: Exception) {}
+                try {
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        analysis
+                    )
+                } catch (e: Exception) {
+                    // Fallback or log
                 }
             } catch (e: Exception) {
                 // Fail gracefully
