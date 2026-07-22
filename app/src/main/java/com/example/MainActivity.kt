@@ -1,5 +1,7 @@
 package com.example
 
+import android.util.Size
+import java.util.concurrent.Executors
 import androidx.camera.core.ExperimentalGetImage
 import android.Manifest
 import android.content.pm.PackageManager
@@ -469,6 +471,7 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasScanned by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val previewView = remember {
         PreviewView(context).apply {
@@ -477,70 +480,102 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
         }
     }
 
-    LaunchedEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner) {
         val executor = ContextCompat.getMainExecutor(context)
+        val analysisExecutor = Executors.newSingleThreadExecutor()
         val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        
-        cameraProviderFuture.addListener({
-            try {
-                val cameraProvider = cameraProviderFuture.get()
+        var cameraProvider: ProcessCameraProvider? = null
+        var launchJob: kotlinx.coroutines.Job? = null
+
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // Cancel previous job if any
+                launchJob?.cancel()
+                cameraProvider?.unbindAll()
                 
-                if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                    return@addListener
-                }
-
-                val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
-                }
-
-                val scanner = BarcodeScanning.getClient()
-                val analysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-
-                analysis.setAnalyzer(executor) { imageProxy ->
-                    processImageProxy(scanner, imageProxy) { result ->
-                        if (!hasScanned) {
-                            hasScanned = true
-                            vibrateFeedback(context)
-                            onScanned(result)
-                        }
-                    }
-                }
-
-                val cameraSelector = when {
-                    cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
-                    cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
-                    else -> CameraSelector.Builder().build()
-                }
-
-                // Retry mechanism for AppOps "Operation not started" on some devices
-                fun bindCamera(retries: Int = 3) {
+                launchJob = coroutineScope.launch {
+                    // Delay to ensure the app is fully in the foreground, bypassing AppOps issues on Android 5-10
+                    delay(500)
                     try {
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            cameraSelector,
-                            preview,
-                            analysis
-                        )
-                    } catch (e: Exception) {
-                        if (retries > 0) {
-                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                bindCamera(retries - 1)
-                            }, 500)
-                        } else {
-                            e.printStackTrace()
+                        val provider = cameraProviderFuture.get()
+                        cameraProvider = provider
+                        
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                            return@launch
                         }
+
+                        // Use a standard low resolution to avoid crash on weird watch screen ratios
+                        val preview = Preview.Builder()
+                            .setTargetResolution(Size(640, 480))
+                            .build().also {
+                                it.setSurfaceProvider(previewView.surfaceProvider)
+                            }
+
+                        val scanner = BarcodeScanning.getClient()
+                        val analysis = ImageAnalysis.Builder()
+                            .setTargetResolution(Size(640, 480))
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+
+                        analysis.setAnalyzer(analysisExecutor) { imageProxy ->
+                            processImageProxy(scanner, imageProxy) { result ->
+                                if (!hasScanned) {
+                                    hasScanned = true
+                                    vibrateFeedback(context)
+                                    onScanned(result)
+                                }
+                            }
+                        }
+
+                        // Try to find ANY available camera
+                        val availableCameras = provider.availableCameraInfos
+                        val cameraSelector = if (availableCameras.isNotEmpty()) {
+                            // Find back camera, or front, or just the first one
+                            when {
+                                provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
+                                provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
+                                else -> CameraSelector.Builder().addCameraFilter { _ -> listOf(availableCameras.first()) }.build()
+                            }
+                        } else {
+                            CameraSelector.DEFAULT_BACK_CAMERA
+                        }
+
+                        // Retry binding in case of lingering AppOps issue
+                        var retries = 3
+                        while (retries > 0) {
+                            try {
+                                provider.unbindAll()
+                                provider.bindToLifecycle(
+                                    lifecycleOwner,
+                                    cameraSelector,
+                                    preview,
+                                    analysis
+                                )
+                                break // Success
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                                retries--
+                                delay(1000)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
-                
-                bindCamera()
-                
-            } catch (e: Exception) {
-                e.printStackTrace()
+            } else if (event == Lifecycle.Event.ON_PAUSE) {
+                launchJob?.cancel()
+                cameraProvider?.unbindAll()
             }
-        }, executor)
+        }
+
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            launchJob?.cancel()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            cameraProvider?.unbindAll()
+            analysisExecutor.shutdown()
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
