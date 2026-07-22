@@ -285,7 +285,7 @@ fun WatchFaceInterface(
                         OtpDetailView(acc, currentTime, onDelete = { onDelete(acc) })
                     }
 
-                    WatchBottomBar(pagerState.currentPage, accounts.size, onScan)
+                    WatchBottomBar(pagerState.currentPage, accounts.size, onScan, onManual, onSync)
                 }
             }
         }
@@ -321,29 +321,40 @@ fun WatchTopBar(currentTime: Long, lockEnabled: Boolean, onToggleLock: (Boolean)
 }
 
 @Composable
-fun WatchBottomBar(currentPage: Int, totalPages: Int, onScan: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+fun WatchBottomBar(currentPage: Int, totalPages: Int, onScan: () -> Unit, onManual: () -> Unit, onSync: () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (totalPages > 1) {
             Text(
                 "${currentPage + 1}/${totalPages}",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 color = Color.DarkGray,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(bottom = 4.dp)
             )
         }
-        IconButton(
-            onClick = onScan,
+        Row(
             modifier = Modifier
-                .size(56.dp)
-                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            Icon(Icons.Default.Add, null, tint = Color.Black, modifier = Modifier.size(36.dp))
+            IconButton(onClick = onSync, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.Sync, null, tint = Color.Gray, modifier = Modifier.size(24.dp))
+            }
+            IconButton(
+                onClick = onScan,
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+            ) {
+                Icon(Icons.Default.QrCodeScanner, null, tint = Color.Black, modifier = Modifier.size(24.dp))
+            }
+            IconButton(onClick = onManual, modifier = Modifier.size(40.dp)) {
+                Icon(Icons.Default.Edit, null, tint = Color.Gray, modifier = Modifier.size(24.dp))
+            }
         }
     }
 }
@@ -466,6 +477,7 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val barcodeView = remember {
         CompoundBarcodeView(context).apply {
             this.setStatusText("")
+            try { this.findViewById<android.view.View>(com.google.zxing.client.android.R.id.zxing_viewfinder_view)?.visibility = android.view.View.GONE } catch (e: Exception) {}
             this.decodeContinuous(object : BarcodeCallback {
                 override fun barcodeResult(result: BarcodeResult?) {
                     result?.text?.let { text ->
