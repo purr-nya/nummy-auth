@@ -2,7 +2,6 @@ package com.example
 
 import android.util.Size
 import java.util.concurrent.Executors
-import androidx.camera.core.ExperimentalGetImage
 import android.Manifest
 import android.content.pm.PackageManager
 import android.app.KeyguardManager
@@ -17,17 +16,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.BackHandler
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.AspectRatio
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -74,6 +62,9 @@ import com.example.data.OtpAccount
 import com.example.data.WebDavConfig
 import com.example.ui.theme.MyApplicationTheme
 import com.example.util.TotpUtils
+import com.journeyapps.barcodescanner.CompoundBarcodeView
+import com.journeyapps.barcodescanner.BarcodeCallback
+import com.journeyapps.barcodescanner.BarcodeResult
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
@@ -471,116 +462,43 @@ fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasScanned by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
 
-    val previewView = remember {
-        PreviewView(context).apply {
-            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-            scaleType = PreviewView.ScaleType.FILL_CENTER
+    val barcodeView = remember {
+        CompoundBarcodeView(context).apply {
+            this.setStatusText("")
+            this.decodeContinuous(object : BarcodeCallback {
+                override fun barcodeResult(result: BarcodeResult?) {
+                    result?.text?.let { text ->
+                        if (!hasScanned) {
+                            hasScanned = true
+                            vibrateFeedback(context)
+                            onScanned(text)
+                        }
+                    }
+                }
+                override fun possibleResultPoints(resultPoints: MutableList<com.google.zxing.ResultPoint>?) {}
+            })
         }
     }
 
     DisposableEffect(lifecycleOwner) {
-        val executor = ContextCompat.getMainExecutor(context)
-        val analysisExecutor = Executors.newSingleThreadExecutor()
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-        var cameraProvider: ProcessCameraProvider? = null
-        var launchJob: kotlinx.coroutines.Job? = null
-
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                // Cancel previous job if any
-                launchJob?.cancel()
-                cameraProvider?.unbindAll()
-                
-                launchJob = coroutineScope.launch {
-                    // Delay to ensure the app is fully in the foreground, bypassing AppOps issues on Android 5-10
-                    delay(500)
-                    try {
-                        val provider = cameraProviderFuture.get()
-                        cameraProvider = provider
-                        
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-                            return@launch
-                        }
-
-                        // Use a standard low resolution to avoid crash on weird watch screen ratios
-                        val preview = Preview.Builder()
-                            .setTargetResolution(Size(640, 480))
-                            .build().also {
-                                it.setSurfaceProvider(previewView.surfaceProvider)
-                            }
-
-                        val scanner = BarcodeScanning.getClient()
-                        val analysis = ImageAnalysis.Builder()
-                            .setTargetResolution(Size(640, 480))
-                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                            .build()
-
-                        analysis.setAnalyzer(analysisExecutor) { imageProxy ->
-                            processImageProxy(scanner, imageProxy) { result ->
-                                if (!hasScanned) {
-                                    hasScanned = true
-                                    vibrateFeedback(context)
-                                    onScanned(result)
-                                }
-                            }
-                        }
-
-                        // Try to find ANY available camera
-                        val availableCameras = provider.availableCameraInfos
-                        val cameraSelector = if (availableCameras.isNotEmpty()) {
-                            // Find back camera, or front, or just the first one
-                            when {
-                                provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) -> CameraSelector.DEFAULT_BACK_CAMERA
-                                provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) -> CameraSelector.DEFAULT_FRONT_CAMERA
-                                else -> CameraSelector.Builder().addCameraFilter { _ -> listOf(availableCameras.first()) }.build()
-                            }
-                        } else {
-                            CameraSelector.DEFAULT_BACK_CAMERA
-                        }
-
-                        // Retry binding in case of lingering AppOps issue
-                        var retries = 3
-                        while (retries > 0) {
-                            try {
-                                provider.unbindAll()
-                                provider.bindToLifecycle(
-                                    lifecycleOwner,
-                                    cameraSelector,
-                                    preview,
-                                    analysis
-                                )
-                                break // Success
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                                retries--
-                                delay(1000)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
-            } else if (event == Lifecycle.Event.ON_PAUSE) {
-                launchJob?.cancel()
-                cameraProvider?.unbindAll()
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                barcodeView.resume()
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
+                barcodeView.pause()
             }
         }
-
         lifecycleOwner.lifecycle.addObserver(observer)
-
         onDispose {
-            launchJob?.cancel()
             lifecycleOwner.lifecycle.removeObserver(observer)
-            cameraProvider?.unbindAll()
-            analysisExecutor.shutdown()
+            barcodeView.pause()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(
-            factory = { previewView },
+            factory = { barcodeView },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -673,26 +591,6 @@ fun ScanningOverlay() {
     }
 }
 
-@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
-private fun processImageProxy(
-    scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
-    imageProxy: ImageProxy,
-    onSuccess: (String) -> Unit
-) {
-    val mediaImage = imageProxy.image
-    if (mediaImage != null) {
-        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        scanner.process(image)
-            .addOnSuccessListener { barcodes ->
-                barcodes.firstOrNull()?.rawValue?.let { onSuccess(it) }
-            }
-            .addOnCompleteListener {
-                imageProxy.close()
-            }
-    } else {
-        imageProxy.close()
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -77,6 +77,7 @@ dependencies {
   implementation(libs.androidx.camera.view)
   implementation(libs.google.mlkit.barcode.scanning)
   implementation(libs.zxing.core)
+  implementation("com.journeyapps:zxing-android-embedded:3.6.0")
   implementation(libs.androidx.room.runtime)
   implementation(libs.androidx.room.ktx)
   ksp(libs.androidx.room.compiler)
