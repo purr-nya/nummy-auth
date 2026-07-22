@@ -400,6 +400,34 @@ fun WatchActionButton(icon: ImageVector, onClick: () -> Unit, color: Color) {
 fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    if (showDeleteConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { androidx.compose.material3.Text("确认删除") },
+            text = { androidx.compose.material3.Text("确定要删除账户 ${acc.issuer} 吗？") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDelete()
+                    }
+                ) {
+                    androidx.compose.material3.Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { showDeleteConfirm = false }) {
+                    androidx.compose.material3.Text("取消", color = Color.White)
+                }
+            },
+            containerColor = Color.DarkGray,
+            titleContentColor = Color.White,
+            textContentColor = Color.White
+        )
+    }
+
     val otp = remember(acc.secret, time) {
         try { TotpUtils.generateTotp(acc.secret) } catch (e: Exception) { "------" }
     }
@@ -422,7 +450,7 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
                     clipboard.setText(androidx.compose.ui.text.AnnotatedString(otp))
                     vibrateFeedback(context)
                 },
-                onLongClick = { onDelete() }
+                onLongClick = { showDeleteConfirm = true }
             )
     ) {
         Text(
