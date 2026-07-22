@@ -500,45 +500,55 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
 fun QrCodeScannerView(onScanned: (String) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var hasScanned by remember { mutableStateOf(false) }
-
-    val barcodeView = remember {
-        CompoundBarcodeView(context).apply {
-            this.setStatusText("")
-            try { this.findViewById<android.view.View>(com.google.zxing.client.android.R.id.zxing_viewfinder_view)?.visibility = android.view.View.GONE } catch (e: Exception) {}
-            this.decodeContinuous(object : BarcodeCallback {
-                override fun barcodeResult(result: BarcodeResult?) {
-                    result?.text?.let { text ->
-                        if (!hasScanned) {
-                            hasScanned = true
-                            vibrateFeedback(context)
-                            onScanned(text)
-                        }
-                    }
-                }
-                override fun possibleResultPoints(resultPoints: MutableList<com.google.zxing.ResultPoint>?) {}
-            })
-        }
-    }
+    var barcodeViewRef by remember { mutableStateOf<CompoundBarcodeView?>(null) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                barcodeView.resume()
+                barcodeViewRef?.resume()
             } else if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) {
-                barcodeView.pause()
+                barcodeViewRef?.pause()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            barcodeView.pause()
+            barcodeViewRef?.pause()
         }
     }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         AndroidView(
-            factory = { barcodeView },
+            factory = { ctx ->
+                CompoundBarcodeView(ctx).apply {
+                    barcodeViewRef = this
+                    this.setStatusText("")
+                    try { this.findViewById<android.view.View>(com.google.zxing.client.android.R.id.zxing_viewfinder_view)?.visibility = android.view.View.GONE } catch (e: Exception) {}
+                    
+                    var scanned = false
+                    this.decodeContinuous(object : BarcodeCallback {
+                        override fun barcodeResult(result: BarcodeResult?) {
+                            result?.text?.let { text ->
+                                if (!scanned) {
+                                    scanned = true
+                                    vibrateFeedback(ctx)
+                                    onScanned(text)
+                                }
+                            }
+                        }
+                        override fun possibleResultPoints(resultPoints: MutableList<com.google.zxing.ResultPoint>?) {}
+                    })
+                    if (lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) {
+                        this.resume()
+                    }
+                }
+            },
+            onRelease = { view ->
+                view.pause()
+                if (barcodeViewRef == view) {
+                    barcodeViewRef = null
+                }
+            },
             modifier = Modifier.fillMaxSize()
         )
 
