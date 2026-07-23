@@ -23,7 +23,7 @@
 
 ## 🚀 下载与运行
 
-前往[Releases](https://github.com/purr-nya/nummy-auth/releases)页面自行下载安装即可
+前往[Releases](https://github.com/purr-nya/numo-auth/releases)页面自行下载安装即可
 
 ## 📦 版本历史
 
