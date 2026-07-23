@@ -60,6 +60,12 @@ class OtpViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateAccount(account: OtpAccount) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.insertAccount(account)
+        }
+    }
+
     fun addAccountFromUri(uriString: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {

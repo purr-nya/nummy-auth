@@ -162,6 +162,7 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
     var currentScreen by remember { mutableStateOf("main") }
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
     var isPermissionRequested by remember { mutableStateOf(false) }
+    var accountToEdit by remember { mutableStateOf<OtpAccount?>(null) }
 
     LaunchedEffect(cameraPermission.status.isGranted) {
         if (cameraPermission.status.isGranted && isPermissionRequested) {
@@ -215,6 +216,22 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
                 onBackup = { c, p -> viewModel.backupToWebDav(c, p, {}, {}) },
                 onRestore = { c, p -> viewModel.restoreFromWebDav(c, p, { _ -> }, {}, {}) }
             )
+            "edit" -> {
+                accountToEdit?.let { acc ->
+                    EditAccountScreen(
+                        account = acc,
+                        onDismiss = { 
+                            currentScreen = "main"
+                            accountToEdit = null
+                        },
+                        onSave = { updatedAcc ->
+                            viewModel.updateAccount(updatedAcc)
+                            currentScreen = "main"
+                            accountToEdit = null
+                        }
+                    )
+                }
+            }
             else -> WatchFaceInterface(
                 accounts = accounts,
                 currentTime = currentTime,
@@ -230,7 +247,11 @@ fun MainScreen(viewModel: OtpViewModel = viewModel(), onToggleLock: (Boolean) ->
                 },
                 onManual = { currentScreen = "manual" },
                 onSync = { currentScreen = "sync" },
-                onDelete = { viewModel.deleteAccount(it) }
+                onDelete = { viewModel.deleteAccount(it) },
+                onEdit = { acc -> 
+                    accountToEdit = acc
+                    currentScreen = "edit"
+                }
             )
         }
     }
@@ -246,7 +267,8 @@ fun WatchFaceInterface(
     onScan: () -> Unit,
     onManual: () -> Unit,
     onSync: () -> Unit,
-    onDelete: (OtpAccount) -> Unit
+    onDelete: (OtpAccount) -> Unit,
+    onEdit: (OtpAccount) -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isRound = configuration.isScreenRound
@@ -282,7 +304,12 @@ fun WatchFaceInterface(
                         pageSpacing = 8.dp
                     ) { page ->
                         val acc = accounts[page]
-                        OtpDetailView(acc, currentTime, onDelete = { onDelete(acc) })
+                        OtpDetailView(
+                            acc = acc, 
+                            time = currentTime, 
+                            onDelete = { onDelete(acc) },
+                            onEdit = { onEdit(acc) }
+                        )
                     }
 
                     WatchBottomBar(pagerState.currentPage, accounts.size, onScan, onManual, onSync)
@@ -397,7 +424,7 @@ fun WatchActionButton(icon: ImageVector, onClick: () -> Unit, color: Color) {
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
+fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit, onEdit: () -> Unit) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -439,9 +466,7 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
         label = "timer_progress"
     )
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
@@ -453,46 +478,74 @@ fun OtpDetailView(acc: OtpAccount, time: Long, onDelete: () -> Unit) {
                 onLongClick = { showDeleteConfirm = true }
             )
     ) {
-        Text(
-            acc.issuer.ifEmpty { "账户" }.uppercase(),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Black,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        
-        Text(
-            otp.chunked(3).joinToString(" "),
-            style = MaterialTheme.typography.displayLarge.copy(
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp,
-                fontSize = 48.sp
-            ),
-            color = Color.White
-        )
-        
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(top = 12.dp)) {
-            CircularProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.size(52.dp),
-                color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                strokeWidth = 6.dp,
-                trackColor = Color.DarkGray.copy(alpha = 0.3f)
-            )
+        IconButton(
+            onClick = onEdit,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 4.dp, end = 4.dp)
+                .size(32.dp)
+        ) {
+            Icon(Icons.Default.Edit, contentDescription = "编辑", tint = Color.Gray, modifier = Modifier.size(20.dp))
+        }
+
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
+        ) {
             Text(
-                "${(progress * 30).toInt()}",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                acc.issuer.ifEmpty { "账户" }.uppercase(),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            
+            if (acc.label.isNotEmpty() && acc.label != acc.issuer) {
+                Text(
+                    acc.label,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.LightGray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            
+            Text(
+                otp.chunked(3).joinToString(" "),
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp,
+                    fontSize = 52.sp
+                ),
                 color = Color.White
             )
+            
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(top = 8.dp)) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(48.dp),
+                    color = if (progress < 0.2f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                    strokeWidth = 5.dp,
+                    trackColor = Color.DarkGray.copy(alpha = 0.3f)
+                )
+                Text(
+                    "${(progress * 30).toInt()}",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                    color = Color.White
+                )
+            }
+            
+            Text(
+                "长按删除",
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 12.sp),
+                color = Color.DarkGray,
+                modifier = Modifier.padding(top = 8.dp)
+            )
         }
-        
-        Text(
-            "长按删除",
-            style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-            color = Color.DarkGray,
-            modifier = Modifier.padding(top = 16.dp)
-        )
     }
 }
 
@@ -796,5 +849,65 @@ fun vibrateFeedback(context: Context) {
     } else {
         @Suppress("DEPRECATION")
         vibrator.vibrate(50)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditAccountScreen(account: OtpAccount, onDismiss: () -> Unit, onSave: (OtpAccount) -> Unit) {
+    var issuerState by remember { mutableStateOf(account.issuer) }
+    var labelState by remember { mutableStateOf(account.label) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("编辑备注", fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(24.dp))
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black, titleContentColor = Color.White)
+            )
+        },
+        containerColor = Color.Black
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedTextField(
+                value = issuerState,
+                onValueChange = { issuerState = it },
+                label = { Text("服务名称 (如 Google)", fontSize = 16.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                textStyle = MaterialTheme.typography.bodyLarge
+            )
+            OutlinedTextField(
+                value = labelState,
+                onValueChange = { labelState = it },
+                label = { Text("账号名称 (如 xxx@gmail.com)", fontSize = 16.sp) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                textStyle = MaterialTheme.typography.bodyLarge
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Button(
+                onClick = {
+                    onSave(account.copy(issuer = issuerState, label = labelState))
+                },
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("保存", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
