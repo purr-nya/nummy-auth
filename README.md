@@ -1,4 +1,4 @@
-# 腕上验证器 (Authenticator) ⌚️
+# Numo 腕上验证器 (Numo Authenticator) ⌚️
 
 专为**非 Wear OS 安卓手表**设计的简洁、高性能、高兼容性双重身份验证 (TOTP 2FA) 应用。最低**兼容 Android 5.0 (API 21)**，让你的二次验证账号在小屏手表上更安全、更易用！
 
@@ -21,12 +21,9 @@
 - **网络同步**：OkHttp (WebDAV API)
 - **最低兼容**：Android 5.0 (API Level 21)
 
-## 🚀 构建与运行
+## 🚀 下载与运行
 
-1. 使用 Android Studio 打开本项目。
-2. 完成 Gradle 依赖同步。
-3. 选择连接的安卓手表或模拟器作为运行目标。
-4. 点击 **Run** (`Shift + F10`) 即可安装部署。
+前往[Releases](https://github.com/purr-nya/nummy-auth/releases)页面自行下载安装即可
 
 ## 📦 版本历史
 
